@@ -85,6 +85,9 @@ const App = () => {
   // Threshold Visual (controlado pelo slider)
   const [displayThreshold, setDisplayThreshold] = useState(0.45);
 
+  // Adicionado para alternar modelos de IA (performance vs. precisão)
+  const [useTinyModel, setUseTinyModel] = useState(false);
+
   const faceApiRef = useRef(null);
 
   // Filtra os resultados visíveis baseado no slider
@@ -110,7 +113,8 @@ const App = () => {
             await Promise.all([
                 faceApiRef.current.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
                 faceApiRef.current.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-                faceApiRef.current.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+                faceApiRef.current.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+                faceApiRef.current.nets.tinyFaceDetector.loadFromUri(MODEL_URL) // Carrega o modelo rápido
             ]);
         }
         setIsModelLoaded(true);
@@ -132,9 +136,23 @@ const App = () => {
     setCurrentStatus("Mapeando biometria facial...");
 
     try {
-        const imgEl = await createImageElement(imgUrl);
-        const detection = await faceApiRef.current
-            .detectSingleFace(imgEl)
+       const imgEl = await createImageElement(imgUrl);
+
+      // --- MELHORIA: Redimensionar se for muito grande ---
+      // Fotos maiores que 1280px matam a performance sem ganho real de precisão para detecção simples.
+      let inputToProcess = imgEl;
+      if (imgEl.width > 1280 || imgEl.height > 1280) {
+          const canvas = document.createElement('canvas');
+          const scale = Math.min(1280 / imgEl.width, 1280 / imgEl.height);
+          canvas.width = imgEl.width * scale;
+          canvas.height = imgEl.height * scale;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(imgEl, 0, 0, canvas.width, canvas.height);
+          inputToProcess = canvas; // Passamos o canvas menor para a IA
+      }
+
+      const detection = await faceApiRef.current
+            .detectSingleFace(inputToProcess)
             .withFaceLandmarks()
             .withFaceDescriptor();
         
@@ -183,7 +201,10 @@ const App = () => {
       let scannedCount = 0;
 
       const faceapi = faceApiRef.current;
-      const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 });
+      // Alterna entre o modelo rápido (Tiny) e o preciso (SSD)
+      const options = useTinyModel 
+          ? new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 }) 
+          : new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 });
       
       // CAPTURA AMPLA: Usamos um limite interno alto (0.6) para capturar
       // até mesmo correspondências duvidosas. O usuário filtra depois com o slider.
@@ -222,6 +243,10 @@ const App = () => {
               scannedCount++;
               setStats({ scanned: scannedCount, found: foundCount });
               if (scannedCount % 5 === 0) await new Promise(r => setTimeout(r, 0));
+
+              // Limpeza explícita para ajudar o Garbage Collector.
+              imgEl.src = "";
+              imgEl.remove();
 
           } catch (err) {
               console.error("Erro:", item.id);
@@ -458,13 +483,13 @@ const App = () => {
 
                     <div className="flex items-center gap-3 w-full md:w-auto">
                         {/* CONTROLES DE FILTRO */}
-                        <div className="flex-1 md:w-64 px-4 py-2 bg-zinc-900 rounded-xl border border-zinc-800 flex flex-col gap-1">
+                        <div className="flex-1 md:w-96 px-4 py-2 bg-zinc-900 rounded-xl border border-zinc-800 flex flex-col gap-1">
                             <div className="flex justify-between text-[10px] text-zinc-500 uppercase font-bold tracking-wider">
                                 <span>Rigoroso</span>
                                 <span>Flexível</span>
                             </div>
                               <input 
-                                  type="range" min="0.3" max="0.8" step="0.0001" // <--- Mudou aqui
+                                  type="range" min="0.3" max="0.8" step="0.0001"
                                   value={displayThreshold} onChange={(e) => setDisplayThreshold(parseFloat(e.target.value))}
                                   className="w-full h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                               />
