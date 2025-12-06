@@ -183,11 +183,11 @@ const App = () => {
       let scannedCount = 0;
 
       const faceapi = faceApiRef.current;
-      const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 });
+      const options = new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 });
       
       // CAPTURA AMPLA: Usamos um limite interno alto (0.6) para capturar
       // até mesmo correspondências duvidosas. O usuário filtra depois com o slider.
-      const HARD_CAPTURE_LIMIT = 0.6; 
+      const HARD_CAPTURE_LIMIT = 0.7; 
 
       for (const item of searchQueue) {
           setCurrentStatus(`Examinando item ${scannedCount + 1}/${searchQueue.length}...`);
@@ -452,7 +452,7 @@ const App = () => {
                             </span>
                         </h2>
                         <p className="text-sm text-zinc-500 mt-1">
-                            Mostrando fotos com similaridade acima de <span className="text-indigo-400 font-bold">{Math.round((1 - displayThreshold) * 100)}%</span>
+                            Mostrando fotos com similaridade acima de <span className="text-indigo-400 font-bold">{((1 - displayThreshold) * 100).toFixed(2)}%</span>
                         </p>
                     </div>
 
@@ -463,11 +463,11 @@ const App = () => {
                                 <span>Rigoroso</span>
                                 <span>Flexível</span>
                             </div>
-                            <input 
-                                type="range" min="0.3" max="0.6" step="0.01"
-                                value={displayThreshold} onChange={(e) => setDisplayThreshold(parseFloat(e.target.value))}
-                                className="w-full h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                            />
+                              <input 
+                                  type="range" min="0.3" max="0.8" step="0.0001" // <--- Mudou aqui
+                                  value={displayThreshold} onChange={(e) => setDisplayThreshold(parseFloat(e.target.value))}
+                                  className="w-full h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                              />
                         </div>
 
                         <KButton variant="secondary" onClick={clearResults} className="!py-3 !px-4 !text-xs whitespace-nowrap">
@@ -495,7 +495,7 @@ const App = () => {
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="text-[10px] text-zinc-400 font-mono truncate max-w-[70%]">{item.file.name}</span>
                                         <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                                            {Math.round((1 - item.distance) * 100)}%
+                                            {((1 - item.distance) * 100).toFixed(2)}%
                                         </span>
                                     </div>
                                     <a 
